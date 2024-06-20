@@ -1,0 +1,260 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+<style>
+    th,td{
+        border:solid 1px;
+        padding:10px;
+    }
+</style>
+
+<div class="container col">
+   
+   <div class="main-form">
+       <div>
+            
+       </div>
+        <div style="margin-top: 61px; margin-left: 525px;">
+            <input type="date" id="orderDate" placeholder="Select a date">
+       </div>
+       <div id="customername">
+            <select id="customerdropdown">
+                <option value="">Select an option</option>
+            </select>
+       </div>
+       <div class="border border-3" style="width:80%;">
+           <input id="orderid" readonly placeholder="OrderId"/>
+            <table id="salesTable">
+                <thead>
+                    <tr>
+                        <th>Serial No</th>
+                        <th>Product Name</th>
+                        <th>Quantity</th>
+                        <th>Price</th>
+                        <th>Basic Total</th>
+                        <th>Add Sale</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="s-n-1">1</td>
+                        <td id="productname-1">
+                            <select id="productdropdown-1" class="productdropdown">
+                                <option value="">Select an option</option>
+                            </select>
+                        </td>
+                        <td id="quantity-1">
+                            <input type="number" id="quantity-input-1" step="1" oninput="validateIntegerInput(this)"/>
+                        </td>
+                        <td id="price-1">
+                            <input type="number" id="price-input-1" />
+                        </td>
+                        <td id="basictotal-1">
+                            <input id="basictotal-input-1" readonly />
+                        </td>
+                        <td id="addsale-1"><a class="btn" id="addsale"><i class="fa fa-plus-square fa-2x" aria-hidden="true"></i></a></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div> <input style="margin-left: 75%;" id="grandtotal" readonly placeholder="grandtotal" /></div>
+      </div>
+      <div class="btn btn-info" id="submitOrder">Submit</div>
+   </div>
+
+   </div>
+</div>
+
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+ <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script>
+$(document).ready(function () {
+    $.ajax({
+            url: "/Customer/GetAllCustomers/",
+            type:"get",
+        success: function (data) {
+                var dropdown = $('#customerdropdown');
+                dropdown.empty();
+                dropdown.append($('<option></option>').attr('value', '').text('Select an Customer'));
+                $.each(data, function (index, item) {
+                    dropdown.append($('<option></option>').attr('value', item.customerId).text(item.name));
+                });
+        }
+    });
+        $.ajax({
+            url: "/Product/GetAllProduct/",
+            type: "get",
+            success: function (data) {
+                var dropdown = $('.productdropdown');
+                dropdown.empty();
+                dropdown.append($('<option></option>').attr('value', '').text('Select an product'));
+                $.each(data, function (index, item) {
+                    dropdown.append($('<option></option>').attr('value', item.productId).text(item.name));
+                });
+            }
+        });
+    $("#productdropdown").on('change', function () {
+            var selectedValue = $(this).val();
+        $.ajax({
+                url: "Product/GetProductById",
+                data: selectedValue,
+                type:"get",
+            success: function (data) {
+
+            }
+        
+        });
+    
+    });
+
+        function calculatethebasictotal(rowcount){
+            var quantity = parseFloat($(`#quantity-input-${rowcount}`).val()) || 0;
+            var price = parseFloat($(`#price-input-${rowcount}`).val()) || 0;
+            var basicTotal = quantity * price;
+            $(`#basictotal-input-${rowcount}`).val(basicTotal);
+            return basicTotal;
+        }
+        function upadategrandtotal(basictotal){
+            var grandtotal = parseFloat($("#grandtotal").val()) || 0;
+            grandtotal=grandtotal+basictotal;
+            $("#grandtotal").val(grandtotal);
+        }
+
+    $("#submitOrder").click(function () {
+            var orderid = $("#orderid").val();
+            var grandtotal = parseFloat($("#grandtotal").val()) || 0;
+            var date = pickdate();
+            var customerId = $("#customerdropdown").val();
+        let formdata = {
+                OrderId:orderid,
+                total: grandtotal,
+                createddate:date,
+                CustomerId:customerId
+        };
+        $.ajax({
+                url: "/Order/CreateOrder/",
+                data:formdata,
+                type:"post",
+            success: function (response) {
+                window.alert("Order placed Successfully:");
+                window.location.reload();
+            }
+        });
+
+    
+    });
+    $("#addsale").click(function () {
+            var rowcount = $('#salesTable tbody tr').length;
+            var newRowNum = rowcount + 1;
+            var basictotal=calculatethebasictotal(rowcount);
+            upadategrandtotal(basictotal);
+            var productId = $(`#productdropdown-${rowcount}`).val();
+        if (rowcount == 1) {
+            var customerId = $("#customerdropdown").val();
+            var date = pickdate();
+            let formdata = {
+                CustomerId: customerId,
+                createddate: date
+            };
+            // if first sale then add order
+            $.ajax({
+                url: "/Order/CreateOrder/",
+                data: formdata,
+                type: "post",
+                success: function (response) {
+                    var orderId = response['orderId'];
+                    $("#orderid").val(orderId);
+                    addsell(newRowNum, orderId, productId, rowcount);
+                }
+            });
+
+        } else {
+            var orderid = $("#orderid").val();
+            addsell(newRowNum, orderid, productId, rowcount);
+        }
+     
+        });
+    function displaynewrow(newRowNum) {
+            var newrow = `<tr>
+                <td id="s-n-${newRowNum}">${newRowNum}</td>
+                     <td id="productname-${newRowNum}">
+                            <select id="productdropdown-${newRowNum}" class="productdropdown">
+                                    <option value="">Select an option</option>
+                                </select>
+                     </td>
+                     <td id="quantity-${newRowNum}">
+                                        <input type="number" id="quantity-input-${newRowNum}" step="1" oninput="validateIntegerInput(this)" />
+                     </td>
+                        <td id="price-${newRowNum}">
+                                <input type="number" id="price-input-${newRowNum}" />
+                        </td>
+                            <td  id="basictotal-${newRowNum}">
+                                <input id="basictotal-input-${newRowNum}" readonly />
+                        </td>
+                        <td id="addsale-${newRowNum}">
+                            <a class="btn" id="addsale"><i class="fa fa-plus-square fa-2x" aria-hidden="true"></i></a>
+                    </td>
+            </tr>`;
+            $('#salesTable tbody').append(newrow);
+            //delete all the add button above the newRowCount
+            deleteaddbtn(newRowNum);
+            loadproductdropdown(newRowNum);
+            
+    }
+    function deleteaddbtn(newRowNum) {
+        for (let i = 1; i < newRowNum; i++) {
+            $(`#addsale-${newRowNum}`).remove();
+        }
+    }
+    function pickdate() {
+            var date = $("#orderDate").val();
+            if (!date) {
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                date = `${yyyy}-${mm}-${dd}`;
+            }
+        return date;
+    }
+    function loadproductdropdown(newRowNum) {
+            $.ajax({
+                url: "/Product/GetAllProduct/",
+                type: "get",
+                success: function (data) {
+                    var dropdown = $(`#productdropdown-${newRowNum}`);
+                    dropdown.empty();
+                    dropdown.append($('<option></option>').attr('value', '').text('Select an product'));
+                    $.each(data, function (index, item) {
+                        dropdown.append($('<option></option>').attr('value', item.productId).text(item.name));
+                    });
+                }
+            });
+    }
+    function addsell(newRowNum,orderId,productId,rowcount) {
+        let data = {
+                orderId:orderId,
+                productId: productId,
+                quantity: $(`#quantity-input-${rowcount}`).val(),
+                rate: $(`#price-input-${rowcount}`).val()
+        };
+            $.ajax({
+                url: "/Sale/Addsale",
+                data: data,
+                type: "post",
+                success: function (response) {
+                    displaynewrow(newRowNum);
+                }
+            });
+            // Add Sale
+
+            
+    }
+});
+
+    function validateIntegerInput(input) {
+        input.value = input.value.replace(/[^0-9]/g, '');
+    }
+</script>
